@@ -143,4 +143,55 @@ describe("LinksExtractor", () => {
             input.end();
         });
     });
+
+    it("should extract uniq url links from html", function(done) {
+        testsUtil.getSampleFileContent("links-uniq-url.html", (
+            err, content) => {
+            if (err) {
+                return;
+            }
+            const extractor = new LinksExtractor({
+                "writableObjectMode": true,
+                "uniqueUrl": true
+            });
+            let outputs = [];
+            extractor.on("data", (data) => {
+                outputs = data;
+            });
+
+            extractor.on("finish", () => {
+                assert.deepEqual(outputs, [{
+                    url: "",
+                    anchor: "empty 1",
+                    dofollow: true
+                },
+                {
+                    url: "javascript:alert('coucou')",
+                    anchor: "javascript 1",
+                    dofollow: true
+                },
+                {
+                    url: "http://example.com/2.html",
+                    anchor: "relative 1",
+                    dofollow: true
+                },
+                {
+                    url: "http://example.com/",
+                    anchor: "absolute 1",
+                    dofollow: true
+                }
+                ]);
+                done();
+            });
+            const input = new PassThrough({
+                "objectMode": true
+            });
+            input.pipe(extractor);
+            input.write({
+                "body": content,
+                "baseUrl": "http://example.com"
+            });
+            input.end();
+        });
+    });
 });

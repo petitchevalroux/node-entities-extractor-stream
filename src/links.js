@@ -27,6 +27,7 @@ class LinksExtractor extends Entities {
         });
         super(options);
         this.onlyHttp = options.onlyHttp || false;
+        this.uniqueUrl = options.uniqueUrl || false;
     }
 
     transformItem(chunk, item) {
@@ -49,10 +50,21 @@ class LinksExtractor extends Entities {
     }
 
     filterItems(items) {
+        const self = this;
         return super
             .filterItems(items)
             .then((items) => {
-                return items;
+                if (!self.uniqueUrl) {
+                    return items;
+                }
+                const uniqSet = new Set();
+                return items.filter((item) => {
+                    if (uniqSet.has(item.url)) {
+                        return false;
+                    }
+                    uniqSet.add(item.url);
+                    return true;
+                });
             });
     }
 
