@@ -32,9 +32,10 @@ class EntitiesExtractorStream extends Transform {
                     return self.transformItem(chunk, item);
                 }))
                 .then((items) => {
-                    callback(null, items.filter((item) => {
-                        return item !== null;
-                    }));
+                    return self.filterItems(items);
+                })
+                .then((items) => {
+                    callback(null, items);
                     return items;
                 })
                 .catch((err) => {
@@ -91,6 +92,17 @@ class EntitiesExtractorStream extends Transform {
         } catch (err) {
             callback(err);
         }
+    }
+
+    filterItems(items) {
+        const self = this;
+        return Promise.resolve(items.filter((item) => {
+            return self.isValidItem(item);
+        }));
+    }
+
+    isValidItem(item) {
+        return item !== null;
     }
 
 }

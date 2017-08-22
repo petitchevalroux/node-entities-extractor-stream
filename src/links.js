@@ -26,6 +26,7 @@ class LinksExtractor extends Entities {
             }
         });
         super(options);
+        this.onlyHttp = options.onlyHttp || false;
     }
 
     transformItem(chunk, item) {
@@ -45,6 +46,33 @@ class LinksExtractor extends Entities {
                 delete link.rel;
                 return link;
             });
+    }
+
+    filterItems(items) {
+        return super
+            .filterItems(items)
+            .then((items) => {
+                return items;
+            });
+    }
+
+    isValidItem(item) {
+        if (!super.isValidItem(item)) {
+            return false;
+        }
+        if (!this.onlyHttp) {
+            return true;
+        }
+        try {
+            const parsedUrl = urlModule.parse(item.url);
+            if (!parsedUrl.protocol) {
+                return false;
+            }
+            return parsedUrl.protocol === "http:" ||
+                parsedUrl.protocol === "https:";
+        } catch (err) {
+            return false;
+        }
     }
 
 }

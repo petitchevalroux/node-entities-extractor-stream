@@ -97,4 +97,50 @@ describe("LinksExtractor", () => {
             input.end();
         });
     });
+
+    it("should extract only http links from html", function(done) {
+        testsUtil.getSampleFileContent("links-http.html", (
+            err, content) => {
+            if (err) {
+                return;
+            }
+            const extractor = new LinksExtractor({
+                "writableObjectMode": true,
+                "onlyHttp": true
+            });
+            let outputs = [];
+            extractor.on("data", (data) => {
+                outputs = data;
+            });
+
+            extractor.on("finish", () => {
+                assert.deepEqual(outputs, [{
+                    url: "http://www.iana.org/domains/example",
+                    anchor: "http",
+                    dofollow: true
+                },
+                {
+                    url: "https://www.iana.org/",
+                    anchor: "https",
+                    dofollow: true
+                },
+                {
+                    url: "http://example.com/relative.html",
+                    anchor: "relative",
+                    dofollow: true
+                }
+                ]);
+                done();
+            });
+            const input = new PassThrough({
+                "objectMode": true
+            });
+            input.pipe(extractor);
+            input.write({
+                "body": content,
+                "baseUrl": "http://example.com"
+            });
+            input.end();
+        });
+    });
 });
