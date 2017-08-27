@@ -5,93 +5,104 @@ const {
         Buffer
     } = require("buffer"),
     cheerio = require("cheerio"),
-    Promise = require("bluebird");
+    Promise = require("bluebird"),
+    contentType = require("content-type");
 class EntitiesExtractorStream extends Transform {
     constructor(options) {
         options.readableObjectMode = true;
         super(options);
         this.mappings = options.mappings || [];
+        this.validContentTypes = options.validContentTypes || [];
     }
 
     _transform(chunk, encoding, callback) {
-        let body = "";
-        if (Buffer.isBuffer(chunk)) {
-            body = chunk.toString();
-        } else if (chunk.body) {
-            body = chunk.body;
-        } else {
-            body = chunk;
-        }
         const self = this;
-        this.getItemsFromContent(body, (err, items) => {
-            if (err) {
-                return callback(err);
-            }
-            Promise
-                .all(items.map((item) => {
-                    return self.transformItem(chunk, item);
-                }))
-                .then((items) => {
-                    return self.filterItems(items);
-                })
-                .then((items) => {
-                    callback(null, items);
-                    return items;
-                })
-                .catch((err) => {
-                    callback(err);
-                });
-        });
+        this
+            .isValidChunk(chunk)
+            .then((validChunk) => {
+                return !validChunk ?
+                    null : self
+                        .getContentFromChunk(chunk)
+                        .then((content) => {
+                            return self.getItemsFromContent(content)
+                                .then((items) => {
+                                    return Promise
+                                        .all(items.map((item) => {
+                                            return self.transformItem(
+                                                chunk,
+                                                item);
+                                        }));
+                                })
+                                .then((items) => {
+                                    return self.filterItems(items);
+                                });
+                        });
+            })
+            .then((items) => {
+                return callback(null, items);
+            })
+            .catch((err) => {
+                callback(err);
+            });
     }
 
     transformItem(chunk, item) {
         return Promise.resolve(item);
     }
 
-    getItemsFromContent(content, callback) {
-        try {
+    getItemsFromContent(content) {
+        const self = this;
+        return new Promise((resolve) => {
             const domContext = cheerio.load(content);
             const items = [];
-            this.mappings.forEach(function(typeMapping) {
+            self.mappings.forEach(function(typeMapping) {
                 domContext(typeMapping.selector)
                     .each(function(i, selectedItem) {
                         let outItem = {
                             "type": typeMapping.type
                         };
-                        selectedItem = domContext(selectedItem);
-                        Object.getOwnPropertyNames(typeMapping.properties)
+                        selectedItem = domContext(
+                            selectedItem);
+                        Object.getOwnPropertyNames(
+                            typeMapping.properties)
                             .forEach(function(property) {
-                                var rule = typeMapping.properties[
-                                    property];
+                                var rule =
+                                    typeMapping.properties[
+                                        property];
                                 var value = null;
-                                var ruleItem = selectedItem;
+                                var ruleItem =
+                                    selectedItem;
                                 if (rule.selector) {
-                                    ruleItem = domContext(
-                                        rule.selector,
-                                        selectedItem
-                                    );
+                                    ruleItem =
+                                        domContext(
+                                            rule.selector,
+                                            selectedItem
+                                        );
                                 }
                                 if (rule.from ===
                                     "attribute") {
-                                    value = ruleItem.attr(
-                                        rule.name);
+                                    value =
+                                        ruleItem.attr(
+                                            rule.name
+                                        );
                                 } else if (rule.from ===
                                     "text") {
-                                    value = ruleItem.text();
+                                    value =
+                                        ruleItem.text();
                                 }
                                 if (typeof(value) ===
                                     "string") {
-                                    outItem[property] =
+                                    outItem[
+                                        property
+                                    ] =
                                         value;
                                 }
                             });
                         items.push(outItem);
                     });
             });
-            callback(null, items);
-        } catch (err) {
-            callback(err);
-        }
+            resolve(items);
+        });
     }
 
     filterItems(items) {
@@ -105,6 +116,38 @@ class EntitiesExtractorStream extends Transform {
         return item !== null;
     }
 
+    isValidChunk(chunk) {
+        const self = this;
+        return new Promise((resolve) => {
+            // we can't/don't need check content type we asume it's valid
+            if (!self.validContentTypes.length || !chunk || !chunk
+                .headers ||
+                !chunk.headers["content-type"]) {
+                return resolve(true);
+            }
+            resolve(self
+                .validContentTypes
+                .indexOf(
+                    contentType
+                        .parse(chunk.headers["content-type"].replace(
+                            new RegExp(";$"), ""))
+                        .type
+                ) > -1
+            );
+        });
+    }
+
+    getContentFromChunk(chunk) {
+        return new Promise((resolve) => {
+            if (Buffer.isBuffer(chunk)) {
+                return resolve(chunk.toString());
+            }
+            if (chunk.body) {
+                return resolve(chunk.body);
+            }
+            resolve(chunk);
+        });
+    }
 }
 
 

@@ -194,4 +194,46 @@ describe("LinksExtractor", () => {
             input.end();
         });
     });
+
+    it("should filter invalid content-type", (done) => {
+        const input = new PassThrough({
+            "objectMode": true
+        });
+        const extractor = new LinksExtractor({
+            "writableObjectMode": true,
+            "uniqueUrl": true,
+            "validContentTypes": ["text/html"]
+        });
+        input.pipe(extractor);
+        let outputs = 0;
+        extractor.on("data", () => {
+            outputs++;
+        });
+        extractor.on("finish", () => {
+            assert.equal(outputs, 2);
+            done();
+        });
+        input.write({
+            "body": "",
+            "headers": {
+                "date": "Mon, 28 Aug 2017 11:32:22 GMT",
+                "content-type": "text/html"
+            }
+        });
+        input.write({
+            "body": "",
+            "headers": {
+                "date": "Mon, 28 Aug 2017 11:32:22 GMT",
+                "content-type": "text/html; charset=utf-8"
+            }
+        });
+        input.write({
+            "body": "",
+            "headers": {
+                "date": "Mon, 28 Aug 2017 11:32:22 GMT",
+                "content-type": "image/png"
+            }
+        });
+        input.end();
+    });
 });
